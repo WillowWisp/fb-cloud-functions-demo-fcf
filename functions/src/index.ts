@@ -99,7 +99,7 @@ export const startLearnSession = functions.https.onRequest((req, res) => {
         await admins.firestore()
           .collection('users')
           .doc(user.email)
-          .update({ currentLearnSession: { courseId: courseId, questionsTotal: parseInt(questionsTotal), questionsAnswered: 0 } });
+          .update({ currentLearnSession: { courseId: courseId, question: null, questionsTotal: parseInt(questionsTotal), questionsAnswered: 0, questionsAnsweredCorrect: 0, } });
         res.send(200).send();
       }
     })
@@ -144,18 +144,15 @@ export const getSessionQuestion = functions.https.onRequest((req, res) => {
           .collection('users')
           .doc(user.email);
 
-        console.log('truoc');
         const currentLearnSession = (await userDoc.get()).get('currentLearnSession');
-        console.log('sau');
-        console.log(currentLearnSession);
+        if (!currentLearnSession) {
+          res.status(500).send({ code: 'custom/internal', message: 'currentLearnSession not found.' });
+        }
 
         if (currentLearnSession.question) {
-          console.log('has question');
-          console.log(currentLearnSession.question);
           res.json(currentLearnSession.question);
         } else {
           // Init question
-          console.log('init question');
           const exerciseTypes = ['vie-eng-sentence-ordering', 'eng-vie-sentence-ordering'];
           // const indexRandom = Math.floor(Math.random() * (exerciseTypes.length - 1));
           const indexRandom = 1;
@@ -182,7 +179,12 @@ export const getSessionQuestion = functions.https.onRequest((req, res) => {
               choices.push('họ', 'ta', 'bò', 'con');
               choices = shuffle(choices);
   
-              const responseJSON = { id: id, questionIndex: currentLearnSession.questionsAnswered, type: 'eng-vie-sentence-ordering', questionStr: questionStr, choices: choices };
+              const responseJSON = {
+                id: id,
+                type: 'eng-vie-sentence-ordering',
+                questionStr: questionStr,
+                choices: choices
+              };
               await userDoc.update({ 'currentLearnSession.question': responseJSON });
               console.log(responseJSON);
   
@@ -195,6 +197,203 @@ export const getSessionQuestion = functions.https.onRequest((req, res) => {
       res.status(500).send(err);
     });
 })
+
+export const setQuestionOfCurrentLearnSession = functions.https.onRequest((req, res) => {
+  const tokenId = req.get('Authorization')?.split('Bearer ')[1];
+
+  verifyJWT(tokenId)
+    .then(async (response) => {
+      const user = await admins.auth().getUser(response.uid);
+      if (user.email) {
+        //Temp fix. TODO
+
+        const userDoc = admins.firestore()
+          .collection('users')
+          .doc(user.email);
+
+        const currentLearnSession = (await userDoc.get()).get('currentLearnSession');
+        if (!currentLearnSession) {
+          res.status(500).send({ code: 'custom/internal', message: 'currentLearnSession not found.' });
+        }
+
+        if (currentLearnSession.question) {
+          res.json(currentLearnSession);
+        } else {
+          // Init question
+          const exerciseTypes = ['vie-eng-sentence-ordering', 'eng-vie-sentence-ordering'];
+          // const indexRandom = Math.floor(Math.random() * (exerciseTypes.length - 1));
+          const indexRandom = 1;
+          
+          switch (exerciseTypes[indexRandom]) {
+            case 'eng-vie-sentence-ordering':
+              // try {
+              const sentencesQuery = await admins.firestore()
+                .collection('exercise-data')
+                .doc('0')
+                .collection('sentences')
+                .where('courseId', '==', currentLearnSession.courseId)
+                .get();
+  
+              const sentencesResponse = sentencesQuery.docs.map(doc => {
+                return {id: doc.id, ...doc.data()} as any;
+              });
+  
+              const indexSentenceRnd = Math.floor(Math.random() * (sentencesResponse.length - 1));
+              const id: string = sentencesResponse[indexSentenceRnd].id;
+              const questionStr: string = sentencesResponse[indexSentenceRnd].eng;
+              const answer: string = sentencesResponse[indexSentenceRnd].vie[0];
+              let choices: Array<string> = answer.split(' ');
+              choices.push('họ', 'ta', 'bò', 'con');
+              choices = shuffle(choices);
+  
+              const responseJSON = {
+                id: id,
+                type: 'eng-vie-sentence-ordering',
+                questionStr: questionStr,
+                choices: choices
+              };
+              console.log('responseJSON');
+              console.log(responseJSON);
+              await userDoc.update({ 'currentLearnSession.question': responseJSON });
+              console.log({ ...currentLearnSession, question: responseJSON });
+  
+              res.json({ ...currentLearnSession, question: responseJSON });
+          }
+        }
+      }
+    })
+    .catch(err => {
+      res.status(500).send(err);
+    });
+})
+
+export const checkSessionQuestionAnswer = functions.https.onRequest((req, res) => {
+  const tokenId = req.get('Authorization')?.split('Bearer ')[1];
+  const { answer } = req.body;
+  console.log('co answer');
+  console.log(answer);
+
+  verifyJWT(tokenId)
+    .then(async (response) => {
+      const user = await admins.auth().getUser(response.uid);
+      if (user.email) {
+        //Temp fix. TODO
+
+        const userDoc = admins.firestore()
+          .collection('users')
+          .doc(user.email);
+
+        const currentLearnSession = (await userDoc.get()).get('currentLearnSession');
+        if (!currentLearnSession) {
+          res.status(500).send({ code: 'custom/internal', message: 'currentLearnSession not found.' });
+        }
+
+        if (currentLearnSession.question) {
+          console.log('co question')
+          const questionId = currentLearnSession.question.id;
+          const questionType = currentLearnSession.question.type;
+
+          if (questionType === 'eng-vie-sentence-ordering') {
+            const questionDoc = await admins.firestore()
+              .collection('exercise-data')
+              .doc('0')
+              .collection('sentences')
+              .doc(questionId)
+              .get();
+
+            console.log('co questionDoc');
+            console.log(questionDoc.data());
+
+            // let questionCorrectAnswers: Array<string> = [];
+            // if (questionDoc.data() !== undefined) {
+            //   questionCorrectAnswers = questionDoc.data().vie;
+            // }
+
+            let questionCorrectAnswers: Array<string> = questionDoc.get('vie');
+
+            console.log('co questionCorrectAnswers');
+            console.log(questionCorrectAnswers);
+
+            console.log('answer sau');
+            console.log(answer.toLowerCase().trim());
+
+            let newQuestionsAnsweredCorrect = parseInt(currentLearnSession.questionsAnsweredCorrect);
+            let isCorrect; // JSON RESPONSE
+            if (questionCorrectAnswers.includes(answer.toLowerCase().trim())) {
+              console.log('dung roi')
+              newQuestionsAnsweredCorrect += 1;
+              isCorrect = true;
+            } else {
+              console.log('sai roi')
+              isCorrect = false;
+            }
+
+            // Update currentLearnSession
+            let isDone; // JSON RESPONSE
+            await userDoc.update({ 'currentLearnSession.question': null });
+            const newQuestionsAnswered = parseInt(currentLearnSession.questionsAnswered) + 1;
+            if (newQuestionsAnswered >= parseInt(currentLearnSession.questionsTotal)) {
+              console.log('xong bai');
+              isDone = true;
+              // await userDoc.update({ 'currentLearnSession': null });
+            } else {
+              console.log('chua xong bai');
+              isDone = false;
+              // await userDoc.update({
+              //   'currentLearnSession.questionsAnswered': newQuestionsAnswered,
+              //   'currentLearnSession.questionsAnsweredCorrect': newQuestionsAnsweredCorrect,
+              // })
+            }
+            
+            await userDoc.update({
+              'currentLearnSession.questionsAnswered': newQuestionsAnswered,
+              'currentLearnSession.questionsAnsweredCorrect': newQuestionsAnsweredCorrect,
+            })
+
+            res.json({ isCorrect: isCorrect, isDone: isDone, correctAnswer: questionCorrectAnswers[0] });
+          }
+        } else {
+          res.status(500).send({ code: 'custom/internal', message: 'There is no question to check' });
+        }
+      }
+    })
+    .catch(err => {
+      res.status(500).send(err);
+    });
+})
+
+export const getCurrentLearnSession = functions.https.onRequest((req, res) => {
+  const tokenId = req.get('Authorization')?.split('Bearer ')[1];
+
+  verifyJWT(tokenId)
+    .then(async (response) => {
+      const user = await admins.auth().getUser(response.uid);
+      if (user.email) {
+        //Temp fix. TODO
+
+        const userDoc = admins.firestore()
+          .collection('users')
+          .doc(user.email);
+
+        console.log('userDoc');
+        console.log(userDoc);
+
+        const currentLearnSession = (await userDoc.get()).get('currentLearnSession');
+        console.log('currentLearnSession');
+        console.log(currentLearnSession);
+        if (!currentLearnSession) {
+          res.status(500).send({ code: 'custom/internal', message: 'currentLearnSession not found.' });
+        } else {
+          res.json(currentLearnSession);
+        }
+      }
+    })
+    .catch(err => {
+      res.status(500).send(err);
+    });
+})
+
+
 
 export const importCourses = functions.https.onRequest(async (req, res) => {
   const { courses } = req.body;
