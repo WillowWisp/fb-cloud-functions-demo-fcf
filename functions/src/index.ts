@@ -1,5 +1,6 @@
 import * as functions from 'firebase-functions';
 import * as admins from 'firebase-admin';
+// import admin = require('firebase-admin');
 // import * as express from 'express';
 // import * as bodyParser from "body-parser";
 
@@ -176,7 +177,6 @@ export const getSessionQuestion = functions.https.onRequest((req, res) => {
               const questionStr: string = sentencesResponse[indexSentenceRnd].eng;
               const answer: string = sentencesResponse[indexSentenceRnd].vie[0];
               let choices: Array<string> = answer.split(' ');
-              choices.push('họ', 'ta', 'bò', 'con');
               choices = shuffle(choices);
   
               const responseJSON = {
@@ -243,7 +243,32 @@ export const setQuestionOfCurrentLearnSession = functions.https.onRequest((req, 
               const questionStr: string = sentencesResponse[indexSentenceRnd].eng;
               const answer: string = sentencesResponse[indexSentenceRnd].vie[0];
               let choices: Array<string> = answer.split(' ');
-              choices.push('họ', 'ta', 'bò', 'con');
+              
+              // Add more random words to 'choices'
+              const vieWordsData = (await admins.firestore()
+                .collection('exercise-data')
+                .doc('0')
+                .collection('words')
+                .doc('vie')
+                .get()).data();
+
+              let vieWordList: Array<string> = [];
+              if (vieWordsData) {
+                console.log('co data');
+                console.log(vieWordsData);
+                vieWordList = [...vieWordsData.wordList];
+              } else {
+                console.log('ko co data');
+                vieWordList = ['họ', 'ta', 'bò', 'đàn', 'ông', 'phụ', 'nữ', 'con', 'mèo', 'uống', 'sữa'];
+              }
+
+              for (let i = 0; i < 4; i++) { // TODO: replace 4 with number of dummy words depending on difficulty
+                const indexWordRnd = Math.floor(Math.random() * (vieWordList.length - 1));
+                choices.push(vieWordList[indexWordRnd]);
+              }
+
+              console.log(choices);
+
               choices = shuffle(choices);
   
               const responseJSON = {
@@ -431,6 +456,60 @@ export const importExerciseVocabularies = functions.https.onRequest(async (req, 
       .collection('vocabularies')
       .add(vocabularies[i]);
   }
+
+  res.send(200).send();
+})
+
+export const importVieWords = functions.https.onRequest(async (req, res) => {
+  const { wordList } = req.body;
+  console.log(wordList);
+
+  // await admin.firestore()
+  //   .collection('exercise-data')
+  //   .doc('0')
+  //   .collection('words')
+  //   .doc('vie')
+  //   .set({ wordList: [...wordList] });
+
+  const vieWordsDoc = await admins.firestore()
+  .collection('exercise-data')
+  .doc('0')
+  .collection('words')
+  .doc('vie');
+
+  // await vieWordsDoc.set({ wordList: [...wordList] });
+  const vieWordsObj = (await vieWordsDoc.get()).data() as any;
+  let oldWordList: Array<any> = [];
+  let newWordList: Array<any> = [];
+
+  if (vieWordsObj && vieWordsObj.wordList) {
+    oldWordList = [...vieWordsObj.wordList];
+  } else {
+    oldWordList = [];
+  }
+  
+  wordList.forEach((word: any) => {
+    if (!oldWordList.includes(word)) {
+      newWordList.push(word);
+    }
+  });
+  await vieWordsDoc.set({ wordList: [...oldWordList, ...newWordList] });
+
+  // if (vieWordsObj.wordList) {
+  //   wordList.forEach((word: any) => {
+  //     if (!vieWordsObj.wordList.includes(word)) {
+  //       newWordList.push(word);
+  //     }
+  //   });
+  //   await vieWordsDoc.set({ wordList: [...vieWordsObj.wordList, ...newWordList] });
+  // } else {
+  //   newWordList = [...wordList];
+  //   await vieWordsDoc.set({ wordList: [...newWordList] });
+  // }
+  
+  
+  // newWordList = [...wordList];
+  // await vieWordsDoc.set({ wordList: [...newWordList] });
 
   res.send(200).send();
 })
