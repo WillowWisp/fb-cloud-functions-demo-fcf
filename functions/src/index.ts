@@ -1,5 +1,6 @@
 import * as functions from 'firebase-functions';
 import * as admins from 'firebase-admin';
+import * as moment from 'moment';
 // import admin = require('firebase-admin');
 // import * as express from 'express';
 // import * as bodyParser from "body-parser";
@@ -100,7 +101,7 @@ export const startLearnSession = functions.https.onRequest((req, res) => {
         await admins.firestore()
           .collection('users')
           .doc(user.email)
-          .update({ currentLearnSession: { courseId: courseId, question: null, questionsTotal: parseInt(questionsTotal), questionsAnswered: 0, questionsAnsweredCorrect: 0, } });
+          .update({ currentLearnSession: { courseId: courseId, question: null, questionsTotal: parseInt(questionsTotal), questionsAnswered: 0, questionsAnsweredCorrect: 0, startAt: moment().toISOString() } });
         res.send(200).send();
       }
     })
@@ -155,7 +156,7 @@ export const getSessionQuestion = functions.https.onRequest((req, res) => {
         } else {
           // Init question
           const exerciseTypes = ['vie-eng-sentence-ordering', 'eng-vie-sentence-ordering'];
-          // const indexRandom = Math.floor(Math.random() * (exerciseTypes.length - 1));
+          // const indexRandom = Math.floor(Math.random() * exerciseTypes.length);
           const indexRandom = 1;
           
           switch (exerciseTypes[indexRandom]) {
@@ -172,7 +173,7 @@ export const getSessionQuestion = functions.https.onRequest((req, res) => {
                 return {id: doc.id, ...doc.data()} as any;
               });
   
-              const indexSentenceRnd = Math.floor(Math.random() * (sentencesResponse.length - 1));
+              const indexSentenceRnd = Math.floor(Math.random() * sentencesResponse.length);
               const id: string = sentencesResponse[indexSentenceRnd].id;
               const questionStr: string = sentencesResponse[indexSentenceRnd].eng;
               const answer: string = sentencesResponse[indexSentenceRnd].vie[0];
@@ -221,7 +222,7 @@ export const setQuestionOfCurrentLearnSession = functions.https.onRequest((req, 
         } else {
           // Init question
           const exerciseTypes = ['vie-eng-sentence-ordering', 'eng-vie-sentence-ordering'];
-          // const indexRandom = Math.floor(Math.random() * (exerciseTypes.length - 1));
+          // const indexRandom = Math.floor(Math.random() * exerciseTypes.length);
           const indexRandom = 1;
           
           switch (exerciseTypes[indexRandom]) {
@@ -238,7 +239,7 @@ export const setQuestionOfCurrentLearnSession = functions.https.onRequest((req, 
                 return {id: doc.id, ...doc.data()} as any;
               });
   
-              const indexSentenceRnd = Math.floor(Math.random() * (sentencesResponse.length - 1));
+              const indexSentenceRnd = Math.floor(Math.random() * sentencesResponse.length);
               const id: string = sentencesResponse[indexSentenceRnd].id;
               const questionStr: string = sentencesResponse[indexSentenceRnd].eng;
               const answer: string = sentencesResponse[indexSentenceRnd].vie[0];
@@ -263,7 +264,7 @@ export const setQuestionOfCurrentLearnSession = functions.https.onRequest((req, 
               }
 
               for (let i = 0; i < 4; i++) { // TODO: replace 4 with number of dummy words depending on difficulty
-                const indexWordRnd = Math.floor(Math.random() * (vieWordList.length - 1));
+                const indexWordRnd = Math.floor(Math.random() * vieWordList.length);
                 choices.push(vieWordList[indexWordRnd]);
               }
 
