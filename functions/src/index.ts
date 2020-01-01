@@ -157,71 +157,94 @@ function shuffle(array: Array<any>): Array<any> {
   return array;
 }
 
-export const getSessionQuestion = functions.https.onRequest((req, res) => {
-  const tokenId = req.get('Authorization')?.split('Bearer ')[1];
+function getElementsFromArray(array: Array<any>, numberOfElements: number): Array<any> {
+  const shuffledArr = shuffle(array);
+  return shuffledArr.splice(0, numberOfElements);
+}
 
-  verifyJWT(tokenId)
-    .then(async (response) => {
-      const user = await admins.auth().getUser(response.uid);
-      if (user.email) {
-        //Temp fix. TODO
+// export const getSessionQuestion = functions.https.onRequest((req, res) => {
+//   const tokenId = req.get('Authorization')?.split('Bearer ')[1];
 
-        const userDoc = admins.firestore()
-          .collection('users')
-          .doc(user.email);
+//   verifyJWT(tokenId)
+//     .then(async (response) => {
+//       const user = await admins.auth().getUser(response.uid);
+//       if (user.email) {
+//         //Temp fix. TODO
 
-        const currentLearnSession = (await userDoc.get()).get('currentLearnSession');
-        if (!currentLearnSession) {
-          res.status(500).send({ code: 'custom/internal', message: 'currentLearnSession not found.' });
-        }
+//         const userDoc = admins.firestore()
+//           .collection('users')
+//           .doc(user.email);
 
-        if (currentLearnSession.question) {
-          res.json(currentLearnSession.question);
-        } else {
-          // Init question
-          const exerciseTypes = ['vie-eng-sentence-ordering', 'eng-vie-sentence-ordering'];
-          // const indexRandom = Math.floor(Math.random() * exerciseTypes.length);
-          const indexRandom = 1;
+//         const currentLearnSession = (await userDoc.get()).get('currentLearnSession');
+//         if (!currentLearnSession) {
+//           res.status(500).send({ code: 'custom/internal', message: 'currentLearnSession not found.' });
+//         }
+
+//         if (currentLearnSession.question) {
+//           res.json(currentLearnSession.question);
+//         } else {
+//           // Init question
+//           const exerciseTypes = ['eng-vie-sentence-picking', 'eng-vie-sentence-ordering'];
+//           // const indexRandom = Math.floor(Math.random() * exerciseTypes.length);
+//           const indexRandom = 1;
           
-          switch (exerciseTypes[indexRandom]) {
-            case 'eng-vie-sentence-ordering':
-              // try {
-              const sentencesQuery = await admins.firestore()
-                .collection('exercise-data')
-                .doc('0')
-                .collection('sentences')
-                .where('courseId', '==', currentLearnSession.courseId)
-                .get();
+//           switch (exerciseTypes[indexRandom]) {
+//             case 'eng-vie-sentence-picking':
+//               const questionsQuery = await admins.firestore()
+//                 .collection('exercise-data')
+//                 .doc('0')
+//                 .collection('eng-vie-sentence-picking')
+//                 .where('courseId', '==', currentLearnSession.courseId)
+//                 .get();
+//               const questionsData = questionsQuery.docs.map(doc => {
+//                 return {id: doc.id, ...doc.data()} as any;
+//               });
+              
+//               const indexSentenceRnd = Math.floor(Math.random() * sentencesResponse.length);
+//               const id: string = sentencesResponse[indexSentenceRnd].id;
+//               const questionStr: string = sentencesResponse[indexSentenceRnd].eng;
+//               const answer: string = sentencesResponse[indexSentenceRnd].vie[0];
+
+//               break;
+//             case 'eng-vie-sentence-ordering':
+//               // try {
+//               const sentencesQuery = await admins.firestore()
+//                 .collection('exercise-data')
+//                 .doc('0')
+//                 .collection('sentences')
+//                 .where('courseId', '==', currentLearnSession.courseId)
+//                 .get();
   
-              const sentencesResponse = sentencesQuery.docs.map(doc => {
-                return {id: doc.id, ...doc.data()} as any;
-              });
+//               const sentencesResponse = sentencesQuery.docs.map(doc => {
+//                 return {id: doc.id, ...doc.data()} as any;
+//               });
   
-              const indexSentenceRnd = Math.floor(Math.random() * sentencesResponse.length);
-              const id: string = sentencesResponse[indexSentenceRnd].id;
-              const questionStr: string = sentencesResponse[indexSentenceRnd].eng;
-              const answer: string = sentencesResponse[indexSentenceRnd].vie[0];
-              let choices: Array<string> = answer.split(' ');
-              choices = shuffle(choices);
+//               const indexSentenceRnd = Math.floor(Math.random() * sentencesResponse.length);
+//               const id: string = sentencesResponse[indexSentenceRnd].id;
+//               const questionStr: string = sentencesResponse[indexSentenceRnd].eng;
+//               const answer: string = sentencesResponse[indexSentenceRnd].vie[0];
+//               let choices: Array<string> = answer.split(' ');
+//               choices = shuffle(choices);
   
-              const responseJSON = {
-                id: id,
-                type: 'eng-vie-sentence-ordering',
-                questionStr: questionStr,
-                choices: choices
-              };
-              await userDoc.update({ 'currentLearnSession.question': responseJSON });
-              console.log(responseJSON);
+//               const responseJSON = {
+//                 id: id,
+//                 type: 'eng-vie-sentence-ordering',
+//                 questionStr: questionStr,
+//                 choices: choices
+//               };
+//               await userDoc.update({ 'currentLearnSession.question': responseJSON });
+//               console.log(responseJSON);
   
-              res.json(responseJSON);
-          }
-        }
-      }
-    })
-    .catch(err => {
-      res.status(500).send(err);
-    });
-})
+//               res.json(responseJSON);
+//               break;
+//           }
+//         }
+//       }
+//     })
+//     .catch(err => {
+//       res.status(500).send(err);
+//     });
+// })
 
 export const setQuestionOfCurrentLearnSession = functions.https.onRequest((req, res) => {
   const tokenId = req.get('Authorization')?.split('Bearer ')[1];
@@ -244,71 +267,100 @@ export const setQuestionOfCurrentLearnSession = functions.https.onRequest((req, 
         if (currentLearnSession.question) {
           res.json(currentLearnSession);
         } else {
+          let responseJSON = {};
           // Init question
-          const exerciseTypes = ['vie-eng-sentence-ordering', 'eng-vie-sentence-ordering'];
-          // const indexRandom = Math.floor(Math.random() * exerciseTypes.length);
-          const indexRandom = 1;
-          
-          switch (exerciseTypes[indexRandom]) {
-            case 'eng-vie-sentence-ordering':
-              // try {
-              const sentencesQuery = await admins.firestore()
-                .collection('exercise-data')
-                .doc('0')
-                .collection('sentences')
-                .where('courseId', '==', currentLearnSession.courseId)
-                .get();
-  
-              const sentencesResponse = sentencesQuery.docs.map(doc => {
-                return {id: doc.id, ...doc.data()} as any;
-              });
-  
-              const indexSentenceRnd = Math.floor(Math.random() * sentencesResponse.length);
-              const id: string = sentencesResponse[indexSentenceRnd].id;
-              const questionStr: string = sentencesResponse[indexSentenceRnd].eng;
-              const answer: string = sentencesResponse[indexSentenceRnd].vie[0];
-              let choices: Array<string> = answer.split(' ');
-              
-              // Add more random words to 'choices'
-              const vieWordsData = (await admins.firestore()
-                .collection('exercise-data')
-                .doc('0')
-                .collection('words')
-                .doc('vie')
-                .get()).data();
+          const exerciseTypes = ['eng-vie-sentence-picking', 'eng-vie-sentence-ordering'];
+          const indexRandom = Math.floor(Math.random() * exerciseTypes.length);
+          // const indexRandom = 0;
 
-              let vieWordList: Array<string> = [];
-              if (vieWordsData) {
-                console.log('co data');
-                console.log(vieWordsData);
-                vieWordList = [...vieWordsData.wordList];
-              } else {
-                console.log('ko co data');
-                vieWordList = ['họ', 'ta', 'bò', 'đàn', 'ông', 'phụ', 'nữ', 'con', 'mèo', 'uống', 'sữa'];
-              }
+          if (exerciseTypes[indexRandom] === 'eng-vie-sentence-picking') {
 
-              for (let i = 0; i < 4; i++) { // TODO: replace 4 with number of dummy words depending on difficulty
-                const indexWordRnd = Math.floor(Math.random() * vieWordList.length);
-                choices.push(vieWordList[indexWordRnd]);
-              }
+            const questionsQuery = await admins.firestore()
+              .collection('exercise-data')
+              .doc('0')
+              .collection('eng-vie-sentence-picking')
+              .where('courseId', '==', currentLearnSession.courseId)
+              .get();
+            const questionsData = questionsQuery.docs.map(doc => {
+              return {id: doc.id, ...doc.data()} as any;
+            });
+            
+            const indexQuestionRnd = Math.floor(Math.random() * questionsData.length);
+            const id: string = questionsData[indexQuestionRnd].id;
+            const questionStr: string = questionsData[indexQuestionRnd].eng;
+            const dummyChoices: Array<string> = questionsData[indexQuestionRnd].choices;
+            let choices: Array<string> = getElementsFromArray(dummyChoices, 2);
+            choices.push(questionsData[indexQuestionRnd].correctAnswers[0]);
+            choices = shuffle(choices);
 
-              console.log(choices);
+            responseJSON = {
+              id: id,
+              type: exerciseTypes[indexRandom],
+              questionStr: questionStr,
+              choices: choices,
+            }
 
-              choices = shuffle(choices);
-  
-              const responseJSON = {
-                id: id,
-                type: 'eng-vie-sentence-ordering',
-                questionStr: questionStr,
-                choices: choices
-              };
-              console.log('responseJSON');
-              console.log(responseJSON);
-              await userDoc.update({ 'currentLearnSession.question': responseJSON });
-              console.log({ ...currentLearnSession, question: responseJSON });
-  
-              res.json({ ...currentLearnSession, question: responseJSON });
+          } else if (exerciseTypes[indexRandom] === 'eng-vie-sentence-ordering') {
+
+            const sentencesQuery = await admins.firestore()
+              .collection('exercise-data')
+              .doc('0')
+              .collection('sentences')
+              .where('courseId', '==', currentLearnSession.courseId)
+              .get();
+
+            const sentencesResponse = sentencesQuery.docs.map(doc => {
+              return {id: doc.id, ...doc.data()} as any;
+            });
+
+            const indexSentenceRnd = Math.floor(Math.random() * sentencesResponse.length);
+            const id: string = sentencesResponse[indexSentenceRnd].id;
+            const questionStr: string = sentencesResponse[indexSentenceRnd].eng;
+            const answer: string = sentencesResponse[indexSentenceRnd].vie[0];
+            let choices: Array<string> = answer.split(' ');
+            
+            // Add more random words to 'choices'
+            const vieWordsData = (await admins.firestore()
+              .collection('exercise-data')
+              .doc('0')
+              .collection('words')
+              .doc('vie')
+              .get()).data();
+
+            let vieWordList: Array<string> = [];
+            if (vieWordsData) {
+              console.log('co data');
+              console.log(vieWordsData);
+              vieWordList = [...vieWordsData.wordList];
+            } else {
+              console.log('ko co data');
+              vieWordList = ['họ', 'ta', 'bò', 'đàn', 'ông', 'phụ', 'nữ', 'con', 'mèo', 'uống', 'sữa'];
+            }
+
+            for (let i = 0; i < 4; i++) { // TODO: replace 4 with number of dummy words depending on difficulty
+              const indexWordRnd = Math.floor(Math.random() * vieWordList.length);
+              choices.push(vieWordList[indexWordRnd]);
+            }
+
+            console.log(choices);
+
+            choices = shuffle(choices);
+
+            responseJSON = {
+              id: id,
+              type: 'eng-vie-sentence-ordering',
+              questionStr: questionStr,
+              choices: choices
+            };
           }
+
+          
+          console.log('responseJSON');
+          console.log(responseJSON);
+          await userDoc.update({ 'currentLearnSession.question': responseJSON });
+          console.log({ ...currentLearnSession, question: responseJSON });
+
+          res.json({ ...currentLearnSession, question: responseJSON });
         }
       }
     })
@@ -339,9 +391,36 @@ export const checkSessionQuestionAnswer = functions.https.onRequest((req, res) =
         }
 
         if (currentLearnSession.question) {
-          console.log('co question')
+          console.log('co question');
+          console.log(currentLearnSession);
           const questionId = currentLearnSession.question.id;
           const questionType = currentLearnSession.question.type;
+
+          let isCorrect = false;
+          let correctAnswer;
+
+          console.log('co questionType');
+          console.log(questionType);
+
+          // START Set isCorrect & correctAnswer
+          if (questionType === 'eng-vie-sentence-picking') {
+            const questionDoc = await admins.firestore()
+              .collection('exercise-data')
+              .doc('0')
+              .collection('eng-vie-sentence-picking')
+              .doc(questionId)
+              .get();
+
+            const questionData = questionDoc.data() as any;
+            if (questionData.correctAnswers.includes(answer.toLowerCase().trim())) {
+              isCorrect = true;
+            } else {
+              isCorrect = false;
+            }
+            correctAnswer = questionData.correctAnswers[0];
+            console.log('isCorrect ne');
+            console.log(isCorrect);
+          }
 
           if (questionType === 'eng-vie-sentence-ordering') {
             const questionDoc = await admins.firestore()
@@ -351,57 +430,39 @@ export const checkSessionQuestionAnswer = functions.https.onRequest((req, res) =
               .doc(questionId)
               .get();
 
-            console.log('co questionDoc');
-            console.log(questionDoc.data());
-
-            // let questionCorrectAnswers: Array<string> = [];
-            // if (questionDoc.data() !== undefined) {
-            //   questionCorrectAnswers = questionDoc.data().vie;
-            // }
-
             let questionCorrectAnswers: Array<string> = questionDoc.get('vie');
 
-            console.log('co questionCorrectAnswers');
-            console.log(questionCorrectAnswers);
-
-            console.log('answer sau');
-            console.log(answer.toLowerCase().trim());
-
-            let newQuestionsAnsweredCorrect = parseInt(currentLearnSession.questionsAnsweredCorrect);
-            let isCorrect; // JSON RESPONSE
             if (questionCorrectAnswers.includes(answer.toLowerCase().trim())) {
-              console.log('dung roi')
-              newQuestionsAnsweredCorrect += 1;
+              // questionsAnsweredCorrect = parseInt(currentLearnSession.questionsAnsweredCorrect) + 1;
               isCorrect = true;
             } else {
-              console.log('sai roi')
               isCorrect = false;
             }
-
-            // Update currentLearnSession
-            let isDone; // JSON RESPONSE
-            await userDoc.update({ 'currentLearnSession.question': null });
-            const newQuestionsAnswered = parseInt(currentLearnSession.questionsAnswered) + 1;
-            if (newQuestionsAnswered >= parseInt(currentLearnSession.questionsTotal)) {
-              console.log('xong bai');
-              isDone = true;
-              // await userDoc.update({ 'currentLearnSession': null });
-            } else {
-              console.log('chua xong bai');
-              isDone = false;
-              // await userDoc.update({
-              //   'currentLearnSession.questionsAnswered': newQuestionsAnswered,
-              //   'currentLearnSession.questionsAnsweredCorrect': newQuestionsAnsweredCorrect,
-              // })
-            }
-            
-            await userDoc.update({
-              'currentLearnSession.questionsAnswered': newQuestionsAnswered,
-              'currentLearnSession.questionsAnsweredCorrect': newQuestionsAnsweredCorrect,
-            })
-
-            res.json({ isCorrect: isCorrect, isDone: isDone, correctAnswer: questionCorrectAnswers[0] });
+            correctAnswer = questionCorrectAnswers[0];
           }
+          // END Set isCorrect & correctAnswer
+          
+          // Update currentLearnSession & set isDone
+          let isDone; // JSON RESPONSE
+          await userDoc.update({ 'currentLearnSession.question': null });
+          const questionsAnswered = parseInt(currentLearnSession.questionsAnswered) + 1;
+          if (questionsAnswered >= parseInt(currentLearnSession.questionsTotal)) {
+            isDone = true;
+          } else {
+            isDone = false;
+          }
+
+          let questionsAnsweredCorrect = parseInt(currentLearnSession.questionsAnsweredCorrect);
+          if (isCorrect == true) {
+            questionsAnsweredCorrect += 1;
+          }
+          
+          await userDoc.update({
+            'currentLearnSession.questionsAnswered': questionsAnswered,
+            'currentLearnSession.questionsAnsweredCorrect': questionsAnsweredCorrect,
+          })
+
+          res.json({ isCorrect: isCorrect, isDone: isDone, correctAnswer: correctAnswer });
         } else {
           res.status(500).send({ code: 'custom/internal', message: 'There is no question to check' });
         }
@@ -466,6 +527,20 @@ export const importExerciseSentences = functions.https.onRequest(async (req, res
       .doc('0')
       .collection('sentences')
       .add(sentences[i]);
+  }
+
+  res.send(200).send();
+})
+
+export const importExerciseEngVieSentencePicking = functions.https.onRequest(async (req, res) => {
+  const { engVieSentencePicking } = req.body;
+
+  for (let i = 0; i < engVieSentencePicking.length; i++) {
+    await admins.firestore()
+      .collection('exercise-data')
+      .doc('0')
+      .collection('eng-vie-sentence-picking')
+      .add(engVieSentencePicking[i]);
   }
 
   res.send(200).send();
