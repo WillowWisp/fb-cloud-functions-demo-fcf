@@ -88,6 +88,30 @@ const verifyJWT = (tokenStr: string | undefined) => {
   })
 }
 
+export const getUserByToken = functions.https.onRequest((req, res) => {
+  const tokenId = req.get('Authorization')?.split('Bearer ')[1];
+
+  verifyJWT(tokenId)
+    .then(async (response) => {
+      const user = await admins.auth().getUser(response.uid);
+      if (user.email) {
+        // Temp fix. TODO
+        const userData = (await admins.firestore()
+          .collection('users')
+          .doc(user.email)
+          .get()).data()
+        
+        res.json(userData);
+      }
+    })
+    .catch(err => {
+      console.log(err);
+      if (err === '401') {
+        res.status(401).send({ code: 'custom/unauthorized', message: 'Unauthorized' });
+      }
+    });
+})
+
 export const startLearnSession = functions.https.onRequest((req, res) => {
   const tokenId = req.get('Authorization')?.split('Bearer ')[1];
 
