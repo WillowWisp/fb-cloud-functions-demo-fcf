@@ -269,11 +269,56 @@ export const setQuestionOfCurrentLearnSession = functions.https.onRequest((req, 
         } else {
           let responseJSON = {};
           // Init question
-          const exerciseTypes = ['eng-vie-sentence-picking', 'eng-vie-sentence-ordering'];
+          const exerciseTypes = ['eng-vie-sentence-picking', 'eng-vie-sentence-ordering', 'vie-eng-vocab-picking'];
           const indexRandom = Math.floor(Math.random() * exerciseTypes.length);
-          // const indexRandom = 0;
+          // const indexRandom = 2;
 
-          if (exerciseTypes[indexRandom] === 'eng-vie-sentence-picking') {
+          if (exerciseTypes[indexRandom] === 'vie-eng-vocab-picking') {
+
+            const questionsQuery = await admins.firestore()
+              .collection('exercise-data')
+              .doc('0')
+              .collection('vie-eng-vocab-picking')
+              .where('courseId', '==', currentLearnSession.courseId)
+              .get();
+
+            const questionsData = questionsQuery.docs.map(doc => {
+              return {...doc.data(), id: doc.id} as any;
+            });
+
+            const indexSentenceRnd = Math.floor(Math.random() * questionsData.length);
+            const questionId: string = questionsData[indexSentenceRnd].id;
+            const questionStr: string = questionsData[indexSentenceRnd].vieMeaning;
+            const questionAnswer: string = questionsData[indexSentenceRnd].engWord;
+            const questionIllustration: string = questionsData[indexSentenceRnd].illustration;
+
+            let choices: Array<any> = []; // { text: 'boy', illustration: 'boy.png' }
+            choices.push({
+              text: questionAnswer,
+              illustration: questionIllustration
+            });
+            
+            // Add more random words to 'choices'
+            const questionsDataLeft = questionsData.filter(question => question.id !== questionId);
+            const twoRandomQuestions = getElementsFromArray(questionsDataLeft, 2);
+            const twoRandomChoices = twoRandomQuestions.map(question => {
+              return {
+                text: question.engWord,
+                illustration: question.illustration
+              };
+            });
+
+            choices = choices.concat(twoRandomChoices);
+            choices = shuffle(choices);
+
+            responseJSON = {
+              id: questionId,
+              type: 'vie-eng-vocab-picking',
+              questionStr: questionStr,
+              choices: choices
+            };
+
+          } else if (exerciseTypes[indexRandom] === 'eng-vie-sentence-picking') {
 
             const questionsQuery = await admins.firestore()
               .collection('exercise-data')
@@ -401,8 +446,34 @@ export const checkSessionQuestionAnswer = functions.https.onRequest((req, res) =
 
           console.log('co questionType');
           console.log(questionType);
+          
+          console.log('co questionId');
+          console.log(questionId);
 
           // START Set isCorrect & correctAnswer
+          if (questionType === 'vie-eng-vocab-picking') {
+            const questionDoc = await admins.firestore()
+              .collection('exercise-data')
+              .doc('0')
+              .collection('vie-eng-vocab-picking')
+              .doc(questionId)
+              .get();
+
+            const questionData = questionDoc.data() as any;
+
+            console.log('questionData');
+            console.log(questionData);
+
+            if (questionData.engWord.toLowerCase().trim() === answer.toLowerCase().trim()) {
+              isCorrect = true;
+            } else {
+              isCorrect = false;
+            }
+            correctAnswer = questionData.engWord;
+            console.log('isCorrect ne');
+            console.log(isCorrect);
+          }
+
           if (questionType === 'eng-vie-sentence-picking') {
             const questionDoc = await admins.firestore()
               .collection('exercise-data')
@@ -418,8 +489,6 @@ export const checkSessionQuestionAnswer = functions.https.onRequest((req, res) =
               isCorrect = false;
             }
             correctAnswer = questionData.correctAnswers[0];
-            console.log('isCorrect ne');
-            console.log(isCorrect);
           }
 
           if (questionType === 'eng-vie-sentence-ordering') {
@@ -541,6 +610,20 @@ export const importExerciseEngVieSentencePicking = functions.https.onRequest(asy
       .doc('0')
       .collection('eng-vie-sentence-picking')
       .add(engVieSentencePicking[i]);
+  }
+
+  res.send(200).send();
+})
+
+export const importExerciseVieEngVocabPicking = functions.https.onRequest(async (req, res) => {
+  const { vieEngVocabPicking } = req.body;
+
+  for (let i = 0; i < vieEngVocabPicking.length; i++) {
+    await admins.firestore()
+      .collection('exercise-data')
+      .doc('0')
+      .collection('vie-eng-vocab-picking')
+      .add(vieEngVocabPicking[i]);
   }
 
   res.send(200).send();
